@@ -42,13 +42,15 @@ server.get('/top-answer/:soID', (req, res) => {
   const { soID } = req.params;
 
   if (!Number.isInteger(+soID)) {
-    res.status(422).json({ error: 'soID given does not match pattern.' })
-    return
+    res.status(422).json({ error: 'soID given does not match pattern.' });
+    return;
   }
 
   Post.findOne({ soID: req.params.soID }).then(post => {
     if (post === null) {
-      res.status(422).json({ error: `No post with id ${req.params.soID} was found.` })
+      res
+        .status(422)
+        .json({ error: `No post with id ${req.params.soID} was found.` });
       return;
     }
     console.log(post);
@@ -61,7 +63,7 @@ server.get('/top-answer/:soID', (req, res) => {
       .sort({ score: -1 })
       .then(post => {
         if (post === null) {
-          res.status(422).json({ error: `No post with top answer found.` })
+          res.status(422).json({ error: `No post with top answer found.` });
           return;
         }
 
@@ -71,10 +73,34 @@ server.get('/top-answer/:soID', (req, res) => {
 });
 
 server.get('/popular-jquery-questions', (req, res) => {
-  Post.find({tags: 'jquery'})
-    .where('score')
+  Post.find({ tags: 'jquery' })
+    .where({ parentID: null })
+    .or([{ score: { $gt: 5000 } }, { 'user.reputation': { $gt: 200000 } }])
     .then(posts => res.json(posts))
-    .catch(err => res.status(422).json(err));
+    .catch(err => res.status(STATUS_USER_ERROR).json(err));
+});
+
+server.get('/npm-answers', (req, res) => {
+  Post.find({ tags: 'npm' })
+    .then(posts => {
+      if (posts.length === 0) {
+        res
+          .status(STATUS_USER_ERROR)
+          .json({ error: 'No posts with npm found.' });
+        return;
+      }
+
+      const answers = posts.map(postInfo => {
+        return postInfo.soID;
+      });
+
+      Post.find()
+        .where('parentID')
+        .in(answers)
+        .then(answerPosts => res.status(200).json(answerPosts))
+        .catch(err => res.status(STATUS_USER_ERROR).json(err));
+    })
+    .catch(err => res.status(STATUS_USER_ERROR).json(err));
 });
 
 module.exports = { server };
